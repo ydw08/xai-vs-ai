@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI vs XAI 비교 시뮬레이터</title>
+    <style>
+        :root {
+            --bg-color: #f4f7f6;
+            --primary-color: #3498db;
+            --ai-bg: #2c3e50; /* 어두운 색 (Black Box 상징) */
+            --xai-bg: #ffffff; /* 밝은 색 (White Box 상징) */
+        }
+
+        body {
+            font-family: 'Apple SD Gothic Neo', sans-serif;
+            background-color: var(--bg-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 { margin-bottom: 10px; color: #333; }
+        p.subtitle { color: #666; margin-bottom: 30px; text-align: center; }
+
+        /* 입력 폼 스타일 */
+        .input-section {
+            background: white;
+            padding: 20px 40px;
+            border-radius: 15px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            margin-bottom: 40px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        
+        .input-group { display: flex; flex-direction: column; }
+        label { font-size: 14px; margin-bottom: 5px; font-weight: bold; color: #555; }
+        input {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            width: 150px;
+            font-size: 16px;
+        }
+
+        button {
+            padding: 12px 30px;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            height: fit-content;
+            margin-top: 15px;
+            transition: 0.3s;
+        }
+        button:hover { background-color: #2980b9; transform: translateY(-2px); }
+
+        /* 결과 비교 영역 */
+        .comparison-container {
+            display: flex;
+            gap: 40px;
+            width: 100%;
+            max-width: 1000px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .model-card {
+            flex: 1;
+            min-width: 300px;
+            border-radius: 15px;
+            padding: 25px;
+            position: relative;
+            transition: 0.3s;
+        }
+
+        /* 일반 AI (Black Box) 스타일 */
+        .ai-model {
+            background-color: var(--ai-bg);
+            color: white;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+        }
+        .ai-model h2 { border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 10px; }
+        
+        /* XAI (White Box) 스타일 */
+        .xai-model {
+            background-color: var(--xai-bg);
+            color: #333;
+            border: 2px solid var(--primary-color);
+            box-shadow: 0 10px 20px rgba(52, 152, 219, 0.2);
+        }
+        .xai-model h2 { border-bottom: 1px solid #eee; padding-bottom: 10px; color: var(--primary-color); }
+
+        .result-box {
+            margin-top: 20px;
+            min-height: 150px;
+        }
+
+        .status { font-size: 24px; font-weight: bold; margin-bottom: 10px; }
+        .status.approved { color: #2ecc71; }
+        .status.rejected { color: #e74c3c; }
+        
+        /* 설명 가능성 시각화 (막대 그래프) */
+        .explanation-chart { margin-top: 15px; display: none; }
+        .bar-container { margin-bottom: 10px; }
+        .bar-label { font-size: 12px; display: flex; justify-content: space-between; }
+        .bar-bg { background: #eee; height: 10px; border-radius: 5px; overflow: hidden; margin-top: 5px; }
+        .bar-fill { height: 100%; background: #95a5a6; width: 0%; transition: width 1s ease-in-out; }
+        
+        .positive-impact { background: #2ecc71; } /* 긍정 요인 (초록) */
+        .negative-impact { background: #e74c3c; } /* 부정 요인 (빨강) */
+
+        .explanation-text {
+            font-size: 14px;
+            line-height: 1.5;
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 8px;
+            margin-top: 15px;
+            border-left: 4px solid var(--primary-color);
+        }
+
+    </style>
+</head>
+<body>
+
+    <h1>AI vs XAI (설명 가능한 AI)</h1>
+    <p class="subtitle">대출 심사 상황에서 두 모델이 어떻게 다른지 확인해보세요.</p>
+
+    <div class="input-section">
+        <div class="input-group">
+            <label for="income">연 소득 ($)</label>
+            <input type="number" id="income" value="45000" placeholder="예: 50000">
+        </div>
+        <div class="input-group">
+            <label for="credit">신용 점수 (0~1000)</label>
+            <input type="number" id="credit" value="650" placeholder="예: 700">
+        </div>
+        <button onclick="runSimulation()">심사 요청</button>
+    </div>
+
+    <div class="comparison-container">
+        
+        <div class="model-card ai-model">
+            <h2>🤖 일반 AI (Black Box)</h2>
+            <p style="opacity: 0.7; font-size: 0.9em;">내부 처리 과정을 알 수 없습니다.</p>
+            <div class="result-box" id="aiResult">
+                <p>데이터 대기 중...</p>
+            </div>
+        </div>
+
+        <div class="model-card xai-model">
+            <h2>🔍 XAI (White Box)</h2>
+            <p style="opacity: 0.7; font-size: 0.9em;">결과의 <strong>원인(기여도)</strong>을 시각화합니다.</p>
+            <div class="result-box" id="xaiResult">
+                <p>데이터 대기 중...</p>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        function runSimulation() {
+            // 입력값 가져오기
+            const income = parseInt(document.getElementById('income').value);
+            const credit = parseInt(document.getElementById('credit').value);
+
+            if (isNaN(income) || isNaN(credit)) {
+                alert("정확한 숫자를 입력해주세요.");
+                return;
+            }
+
+            // --- 로직 설정 (간단한 규칙) ---
+            // 기준: 소득 50000 이상 AND 신용점수 700 이상이면 승인
+            // 실제 AI는 복잡한 수식이지만 여기선 간단히 시뮬레이션합니다.
+            
+            let isApproved = false;
+            let score = 0; // 내부 점수 (확률)
+
+            // 소득 기여도 계산 (0.5 만점)
+            let incomeScore = Math.min(income / 60000, 1) * 0.5;
+            // 신용 기여도 계산 (0.5 만점)
+            let creditScore = Math.min(credit / 800, 1) * 0.5;
+            
+            let totalScore = incomeScore + creditScore; // 0.0 ~ 1.0
+
+            if (totalScore >= 0.7) {
+                isApproved = true;
+            }
+
+            // --- 1. 일반 AI 결과 출력 (단순 결과만) ---
+            const aiBox = document.getElementById('aiResult');
+            aiBox.innerHTML = `
+                <div style="margin-top:20px;">
+                    <p>분석 중...</p>
+                </div>
+            `;
+
+            setTimeout(() => {
+                const statusText = isApproved ? "대출 승인 (Approved)" : "대출 거절 (Rejected)";
+                const statusClass = isApproved ? "approved" : "rejected";
+                
+                // AI는 단순히 결과와 확률(Confidence)만 던져줌
+                aiBox.innerHTML = `
+                    <div class="status ${statusClass}" style="margin-top:20px;">${statusText}</div>
+                    <p>예측 신뢰도: ${Math.round(totalScore * 100)}%</p>
+                    <hr style="opacity:0.3; margin: 20px 0;">
+                    <p style="color: #ccc; font-style: italic;">
+                        "왜 이런 결과가 나왔는지 알 수 없음.<br>내부 알고리즘은 비공개 상태."
+                    </p>
+                `;
+            }, 500);
+
+
+            // --- 2. XAI 결과 출력 (결과 + 기여도 분석 시각화) ---
+            const xaiBox = document.getElementById('xaiResult');
+            xaiBox.innerHTML = `<p>데이터 해석 중...</p>`;
+
+            setTimeout(() => {
+                const statusText = isApproved ? "대출 승인" : "대출 거절";
+                const statusClass = isApproved ? "approved" : "rejected";
+                
+                // SHAP Value 같은 기여도 시각화 로직 (여기선 단순 비율)
+                // 소득이 긍정적인지 부정적인지 판단
+                const incomeInfluence = (income >= 50000) ? "positive-impact" : "negative-impact";
+                const creditInfluence = (credit >= 700) ? "positive-impact" : "negative-impact";
+
+                const incomeWidth = Math.min((income / 60000) * 100, 100);
+                const creditWidth = Math.min((credit / 800) * 100, 100);
+
+                // 설명 텍스트 생성
+                let explanation = "";
+                if (isApproved) {
+                    explanation = `<strong>성공 요인:</strong> 높은 연 소득(${income}$)과 안정적인 신용점수(${credit}점)가 긍정적으로 작용했습니다.`;
+                } else {
+                    explanation = `<strong>거절 사유:</strong> `;
+                    if (income < 50000) explanation += `연 소득이 기준보다 낮음(-${50000-income}$), `;
+                    if (credit < 700) explanation += `신용 점수가 위험 수준임. `;
+                }
+
+                xaiBox.innerHTML = `
+                    <div class="status ${statusClass}" style="margin-top:20px;">${statusText}</div>
+                    
+                    <div class="explanation-chart" style="display:block;">
+                        <p style="font-weight:bold; margin-bottom:10px;">📊 판단 근거 (Feature Importance)</p>
+                        
+                        <div class="bar-container">
+                            <div class="bar-label"><span>연 소득 영향력</span> <span>${income}$</span></div>
+                            <div class="bar-bg">
+                                <div class="bar-fill ${incomeInfluence}" style="width: ${incomeWidth}%"></div>
+                            </div>
+                        </div>
+
+                        <div class="bar-container">
+                            <div class="bar-label"><span>신용 점수 영향력</span> <span>${credit}점</span></div>
+                            <div class="bar-bg">
+                                <div class="bar-fill ${creditInfluence}" style="width: ${creditWidth}%"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="explanation-text">
+                        ${explanation}
+                    </div>
+                `;
+            }, 500);
+        }
+    </script>
+</body>
+</html>
